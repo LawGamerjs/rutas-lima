@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIMA URBANA | Guía de Recreación y Ocio</title>
+    
+    <!-- Fuentes y CDN de Mapa e Iconos -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- CSS Nativo Separado -->
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="header-brand">
+            <div class="brand-icon"><i class="fa-solid fa-compass"></i></div>
+            <div>
+                <span class="brand-tag">Guía Urbana de Lima</span>
+                <h1 class="brand-title">150 Lugares de Ocio</h1>
+            </div>
+        </div>
+
+        <div class="header-badges">
+            <span class="badge badge-accessible"><span class="badge-dot"></span> 50 Gratis</span>
+            <span class="badge badge-medium"><span class="badge-dot"></span> 50 Medianos</span>
+            <span class="badge badge-premium"><span class="badge-dot"></span> 50 Premium</span>
+        </div>
+
+        <div class="mobile-view-switcher">
+            <button id="btnMapMobile" class="switcher-btn active">Mapa</button>
+            <button id="btnListMobile" class="switcher-btn">Lista</button>
+        </div>
+    </header>
+
+    <div class="main-workspace">
+        <aside id="sidebar" class="sidebar">
+            <div class="filter-container">
+                <div class="search-wrapper">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Buscar lugar, café o distrito..." class="search-input">
+                    <button id="clearSearchBtn" class="clear-search-btn" style="display: none;">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="select-wrapper">
+                    <label class="select-label"><i class="fa-solid fa-location-dot" style="color: var(--color-terracotta);"></i> Distrito:</label>
+                    <select id="districtFilter" class="district-select">
+                        <option value="ALL">Todos los distritos (150)</option>
+                        <option value="Rímac">Rímac</option>
+                        <option value="Miraflores">Miraflores</option>
+                        <option value="Comas">Comas</option>
+                        <option value="Los Olivos">Los Olivos</option>
+                    </select>
+                </div>
+
+                <div class="category-pills" id="categoryFilters">
+                    <button data-category="ALL" class="pill-btn active">Todos</button>
+                    <button data-category="ACCESSIBLE" class="pill-btn"><span class="badge-dot" style="background: var(--color-moss);"></span> Gratis</button>
+                    <button data-category="MEDIUM" class="pill-btn"><span class="badge-dot" style="background: var(--color-amber);"></span> Medio</button>
+                    <button data-category="PREMIUM" class="pill-btn"><span class="badge-dot" style="background: var(--color-burgundy);"></span> Premium</button>
+                </div>
+            </div>
+
+            <div class="summary-bar">
+                <span>Lugares mostrados: <strong id="locationCount">150</strong></span>
+                <span>Selecciona para ubicar</span>
+            </div>
+
+            <div id="locationsList" class="cards-scroll-list"></div>
+        </aside>
+
+        <main id="mapContainer" class="map-container">
+            <div id="map"></div>
+
+            <div class="map-legend">
+                <div class="legend-title">Niveles de Presupuesto</div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-moss);"></span>
+                    <span><b>Accesible:</b> Espacios públicos / S/ 0</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-amber);"></span>
+                    <span><b>Mediano:</b> Cafés y Restaurantes / S/ 15-70</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-dot" style="background: var(--color-burgundy);"></span>
+                    <span><b>Premium:</b> Experiencias VIP (&le; S/ 200)</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div><b>LIMA URBANA</b> — Guía de Recreación</div>
+        <div class="footer-stats">
+            <span>Rímac: 38</span>
+            <span>Miraflores: 39</span>
+            <span>Comas: 36</span>
+            <span>Los Olivos: 37</span>
+        </div>
+        <div>&copy; 2026 Lima Urbana</div>
+    </footer>
+
+    <script>
+        // Inyección de API Key desde variable de entorno de Render
+        const RENDER_SECRET_KEY = window.ENV_MAPS_KEY || "";
+        if (RENDER_SECRET_KEY) {
+            const googleScript = document.createElement('script');
+            googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${RENDER_SECRET_KEY}&libraries=places`;
+            googleScript.async = true;
+            document.head.appendChild(googleScript);
+        }
+
+        const rawLocations = [
+            // ==================== ACCESSIBLE (50) ====================
+            // Rímac (13)
+            { name: "Alameda de los Descalzos", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Paseo peatonal virreinal con esculturas de mármol de las cuatro estaciones.", lat: -12.0361, lng: -77.0278, icon: "fa-tree" },
+            { name: "Paseo de Aguas", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Alameda del siglo XVIII con arquería, fuentes e iluminación nocturna.", lat: -12.0375, lng: -77.0264, icon: "fa-water" },
+            { name: "Plazuela del Baratillo", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza pública tradicional virreinal en el corazón del Rímac.", lat: -12.0402, lng: -77.0289, icon: "fa-landmark" },
+            { name: "Parque La Muralla", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque al borde del río con vista a las antiguas murallas coloniales de Lima.", lat: -12.0431, lng: -77.0260, icon: "fa-tree" },
+            { name: "Alameda de Acho", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Corredor cívico peatonal adyacente a la emblemática plaza histórica.", lat: -12.0418, lng: -77.0235, icon: "fa-person-walking" },
+            { name: "Parque El Maestro", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Tranquila área verde vecinal para caminatas y lectura al aire libre.", lat: -12.0331, lng: -77.0298, icon: "fa-tree" },
+            { name: "Plazuela de San Lázaro", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plazuela rodeada de casonas virreinales y entorno histórico.", lat: -12.0388, lng: -77.0295, icon: "fa-building-columns" },
+            { name: "Alameda de los Bobos", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Antiguo pasaje sombreado virreinal con vegetación tradicional.", lat: -12.0348, lng: -77.0269, icon: "fa-tree" },
+            { name: "Plazuela de Amancaes (Parque Felipe Pinglo)", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Espacio verde cívico y tradicional en el Paseo de Amancaes, en homenaje al compositor criollo.", lat: -12.0287, lng: -77.0280, icon: "fa-tree" },
+            { name: "Parque del Avión (FAP José Abelardo Quiñones)", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque público con el monumento al avión FAP, áreas verdes y espacio de recreación.", lat: -12.0298, lng: -77.0252, icon: "fa-plane" },
+            { name: "Paseo de la Revolución", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Espacio público peatonal arbolado ideal para el descanso diurno.", lat: -12.0312, lng: -77.0335, icon: "fa-person-walking" },
+            { name: "Plaza de Armas del Rímac", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza cívica renovada para paseos matutinos y descanso urbano.", lat: -12.0392, lng: -77.0310, icon: "fa-archway" },
+            { name: "Paseo de la Revolución", district: "Rímac", category: "ACCESSIBLE", budget: "S/ 0", desc: "Pasaje peatonal sombreado con bancas de descanso.", lat: -12.0312, lng: -77.0335, icon: "fa-person-walking" },
+
+            // Miraflores (13)
+            { name: "Parque Tradiciones", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque homenaje a Ricardo Palma rodeado de alamedas y esculturas.", lat: -12.1265, lng: -77.0221, icon: "fa-book-open" },
+            { name: "Larcomar (Malecón y Mirador)", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Paseo público en el acantilado con vista espectacular al Océano Pacífico.", lat: -12.1319, lng: -77.0305, icon: "fa-water" },
+            { name: "Parque John F. Kennedy", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "El parque central de Miraflores, icónico para caminatas y feria de arte.", lat: -12.1205, lng: -77.0292, icon: "fa-tree" },
+            { name: "Parque del Amor", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Famoso mirador costero con mosaicos ondulantes y la escultura El Beso.", lat: -12.1258, lng: -77.0368, icon: "fa-heart" },
+            { name: "Parque Antonio Raimondi", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Amplia pradera verde frente al mar donde vuelan los parapentes.", lat: -12.1221, lng: -77.0381, icon: "fa-wind" },
+            { name: "Parque Faro Marina", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Paseo del malecón enmarcado por el histórico faro activo de 1900.", lat: -12.1172, lng: -77.0389, icon: "fa-tower-observation" },
+            { name: "Parque Miguel Grau", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza cívica al borde del acantilado con monumento patriótico.", lat: -12.1128, lng: -77.0384, icon: "fa-anchor" },
+            { name: "Parque Reducto N° 2", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Santuario patriótico arbolado con locomotora antigua y jardines.", lat: -12.1292, lng: -77.0210, icon: "fa-monument" },
+            { name: "Malecón Cisneros", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Largo corredor de jardines costeros ideal para caminatas largas.", lat: -12.1201, lng: -77.0382, icon: "fa-person-walking" },
+            { name: "Parque Dominguett", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque residencial arbolado extremadamente apacible.", lat: -12.1158, lng: -77.0225, icon: "fa-tree" },
+            { name: "Parque Isaac Rabin", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Espacio verde abierto de paz con vista privilegiada al atardecer.", lat: -12.1139, lng: -77.0386, icon: "fa-sun" },
+            { name: "Plazuela Musto", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Pequeño oasis urbano con sombra natural.", lat: -12.1189, lng: -77.0321, icon: "fa-leaf" },
+            { name: "Bajada de Balta", district: "Miraflores", category: "ACCESSIBLE", budget: "S/ 0", desc: "Histórica bajada adoquinada con exuberante vegetación directo a la playa.", lat: -12.1245, lng: -77.0328, icon: "fa-shoe-prints" },
+
+            // Comas (12)
+            { name: "Club Metropolitano Sinchi Roca", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0 - 3", desc: "El pulmón verde más grande de Lima Norte con senderos y arboledas.", lat: -11.9362, lng: -77.0510, icon: "fa-tree" },
+            { name: "Plaza de Armas de Comas", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza principal remodelada con iluminación cálida y fuentes.", lat: -11.9308, lng: -77.0461, icon: "fa-landmark" },
+            { name: "Parque Zonal Manco Cápac", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Área de recreación cívica para caminatas diurnas en familia.", lat: -11.9482, lng: -77.0520, icon: "fa-tree" },
+            { name: "Alameda Universitaria", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Paseo peatonal arbolado a lo largo de la vía universitaria.", lat: -11.9405, lng: -77.0601, icon: "fa-person-walking" },
+            { name: "Parque Central de Año Nuevo", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Centro de reunión vecinal y esparcimiento al aire libre.", lat: -11.9189, lng: -77.0421, icon: "fa-people-group" },
+            { name: "Parque Zonal de Collique", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Área verde extensa en la zona histórica de Collique.", lat: -11.9280, lng: -77.0345, icon: "fa-tree" },
+            { name: "Plaza Cívica de Comas", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Explanada amplia para ferias locales y paseo de tarde.", lat: -11.9345, lng: -77.0482, icon: "fa-archway" },
+            { name: "Alameda del Retablo", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Corredor residencial ajardinado en la Urb. El Retablo.", lat: -11.9491, lng: -77.0580, icon: "fa-leaf" },
+            { name: "Parque Zonal San Luzmila", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque tranquilo con sombra natural de eucaliptos.", lat: -11.9560, lng: -77.0610, icon: "fa-tree" },
+            { name: "Malecón Chillón", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Bulevar público para caminatas con vista al río Chillón.", lat: -11.9120, lng: -77.0650, icon: "fa-water" },
+            { name: "Parque El Pinar", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Pequeño parque apacible rodeado de zonas residenciales.", lat: -11.9431, lng: -77.0540, icon: "fa-tree" },
+            { name: "Parque Santa Rosa", district: "Comas", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza pública con pérgolas y descanso sombreado.", lat: -11.9510, lng: -77.0490, icon: "fa-building-columns" },
+
+            // Los Olivos (12)
+            { name: "Explanada Municipalidad de Los Olivos", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza cívica central del distrito sobre la Av. Carlos Izaguirre.", lat: -11.9918, lng: -77.0708, icon: "fa-landmark" },
+            { name: "Explanada Palacio de la Juventud", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Espacio cultural y peatonal al aire libre altamente concurrido.", lat: -11.9895, lng: -77.0782, icon: "fa-building-ngo" },
+            { name: "Paseo Peatonal Las Palmeras", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Bulevar arbolado con palmeras imponentes ideal para caminatas.", lat: -11.9852, lng: -77.0710, icon: "fa-tree" },
+            { name: "Plaza Las Palmeras", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque verde tranquilo frente al área comercial del distrito.", lat: -11.9831, lng: -77.0725, icon: "fa-leaf" },
+            { name: "Alameda Antúnez de Mayolo", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Avenida peatonal y comercial llena de vida urbana.", lat: -11.9961, lng: -77.0719, icon: "fa-person-walking" },
+            { name: "Plaza Cívica de Pro", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "El punto cívico y de reunión principal de la urbanización Pro.", lat: -11.9542, lng: -77.0731, icon: "fa-archway" },
+            { name: "Plaza Cívica Los Olivos de Pro", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza amplia de diseño contemporáneo para descanso.", lat: -11.9581, lng: -77.0760, icon: "fa-city" },
+            { name: "Parque de los Novios", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Pintoresco parque con glorieta e iluminaciones para paseos de pareja.", lat: -11.9981, lng: -77.0752, icon: "fa-heart" },
+            { name: "Plaza La Paz de Naranjal", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Parque cívico residencial rodeado de jardines cuidados.", lat: -11.9810, lng: -77.0621, icon: "fa-tree" },
+            { name: "Plaza La Bandera de Los Olivos", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Plaza abierta con astas y espacio para actividades comunitarias.", lat: -11.9592, lng: -77.0691, icon: "fa-flag" },
+            { name: "Alameda Los Alisos", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Larga berma central ajardinada para trotar o caminar.", lat: -11.9860, lng: -77.0790, icon: "fa-person-walking" },
+            { name: "Plaza Cívica de Chillón", district: "Los Olivos", category: "ACCESSIBLE", budget: "S/ 0", desc: "Espacio de esparcimiento en la zona norte de Los Olivos.", lat: -11.9392, lng: -77.0781, icon: "fa-landmark" },
+            // ==================== MEDIUM (50) ====================
+        // Rímac (12)
+        { name: "Chicharronería Rímac", district: "Rímac", category: "MEDIUM", budget: "S/ 20 - 40", desc: "Desayunos criollos con panceta crocante y camote frito.", lat: -12.0381, lng: -77.0281, icon: "fa-utensils" },
+        { name: "Picantería El Misti de Oro", district: "Rímac", category: "MEDIUM", budget: "S/ 30 - 60", desc: "Huarique tradicional de comida criolla y marina de antaño.", lat: -12.0359, lng: -77.0291, icon: "fa-utensils" },
+        { name: "Casa O'Higgins - Centro Cultural", district: "Rímac", category: "MEDIUM", budget: "S/ 10 - 25", desc: "Casona restaurada por la PUCP con exposiciones de arte folclórico.", lat: -12.0421, lng: -77.0301, icon: "fa-building-columns" },
+        { name: "Dulcería La Flor de la Canela", district: "Rímac", category: "MEDIUM", budget: "S/ 15 - 30", desc: "Tradicional salón de postres de cuchara como ranfañote y mazamorra.", lat: -12.0368, lng: -77.0312, icon: "fa-cookie" },
+        { name: "Fuente de Soda Luna", district: "Rímac", category: "MEDIUM", budget: "S/ 15 - 35", desc: "Juguería artesanal y sánguches en la Av. El Sol.", lat: -12.0341, lng: -77.0321, icon: "fa-glass-water" },
+        { name: "Casona Las 13 Puertas", district: "Rímac", category: "MEDIUM", budget: "S/ 10 - 20", desc: "Espacio cultural recuperado con salas de exhibición temporal.", lat: -12.0412, lng: -77.0280, icon: "fa-landmark" },
+        { name: "Pollería Norky's Rímac", district: "Rímac", category: "MEDIUM", budget: "S/ 25 - 50", desc: "Clásico pollo a la brasa en el centro histórico rimaqueño.", lat: -12.0371, lng: -77.0305, icon: "fa-drumstick-bite" },
+        { name: "Café Colonial El Rímac", district: "Rímac", category: "MEDIUM", budget: "S/ 15 - 35", desc: "Café artesanal en casona antigua para lonches tranquilos.", lat: -12.0398, lng: -77.0288, icon: "fa-mug-hot" },
+        { name: "Chifa San Joy Lao Rímac", district: "Rímac", category: "MEDIUM", budget: "S/ 35 - 70", desc: "Sede de la histórica gastronomía peruano-china cantonesa.", lat: -12.0379, lng: -77.0271, icon: "fa-bowl-rice" },
+        { name: "Pastelería Rímac Tradicional", district: "Rímac", category: "MEDIUM", budget: "S/ 12 - 30", desc: "Hojaldres criollos y turrones tradicionales.", lat: -12.0362, lng: -77.0300, icon: "fa-cake-candles" },
+        { name: "Heladería Artesanal Rímac", district: "Rímac", category: "MEDIUM", budget: "S/ 10 - 25", desc: "Helados criollos con frutas nativas como lúcuma y chirimoya.", lat: -12.0385, lng: -77.0298, icon: "fa-ice-cream" },
+        { name: "El Rincón Rímaqueño", district: "Rímac", category: "MEDIUM", budget: "S/ 30 - 60", desc: "Restaurante criollo especialista en secos y carapulcra.", lat: -12.0349, lng: -77.0285, icon: "fa-utensils" },
+
+        // Miraflores (13)
+        { name: "La Tiendecita Blanca", district: "Miraflores", category: "MEDIUM", budget: "S/ 35 - 70", desc: "Legendario café-pastelería suizo de 1936 frente al Parque Kennedy.", lat: -12.1208, lng: -77.0298, icon: "fa-mug-hot" },
+        { name: "Café de la Paz", district: "Miraflores", category: "MEDIUM", budget: "S/ 40 - 75", desc: "Café bistró histórico en la esquina del parque principal.", lat: -12.1201, lng: -77.0289, icon: "fa-mug-hot" },
+        { name: "Heladería 4D Angamos", district: "Miraflores", category: "MEDIUM", budget: "S/ 20 - 40", desc: "Gelatería italiana tradicional artesanal con recetas exclusivas.", lat: -12.1121, lng: -77.0321, icon: "fa-ice-cream" },
+        { name: "Librería Café El Virrey", district: "Miraflores", category: "MEDIUM", budget: "S/ 20 - 50", desc: "Cafetería cultural rodeada del catálogo de libros más extenso de Lima.", lat: -12.1231, lng: -77.0312, icon: "fa-book" },
+        { name: "Pastelería San Antonio", district: "Miraflores", category: "MEDIUM", budget: "S/ 30 - 65", desc: "Salón de té tradicional famoso por sus empanadas y mofletes.", lat: -12.1118, lng: -77.0278, icon: "fa-cake-candles" },
+        { name: "Indian Market", district: "Miraflores", category: "MEDIUM", budget: "S/ 15 - 60", desc: "Paseo de compras artesanales y galerías de textiles andinos.", lat: -12.1152, lng: -77.0281, icon: "fa-store" },
+        { name: "Madam Tusan Santa Cruz", district: "Miraflores", category: "MEDIUM", budget: "S/ 45 - 80", desc: "Chifa de alta cocina creado por Gastón Acurio.", lat: -12.1105, lng: -77.0352, icon: "fa-bowl-rice" },
+        { name: "Cevichería Punto Azul Benavides", district: "Miraflores", category: "MEDIUM", budget: "S/ 40 - 75", desc: "Referente miraflorino de pesca marina fresca y tiraditos.", lat: -12.1261, lng: -77.0241, icon: "fa-fish" },
+        { name: "Café Havanna Miraflores", district: "Miraflores", category: "MEDIUM", budget: "S/ 20 - 40", desc: "Cafetería rioplatense especialista en alfajores artesanales.", lat: -12.1215, lng: -77.0308, icon: "fa-mug-hot" },
+        { name: "Pastelería San Antonio Balboa", district: "Miraflores", category: "MEDIUM", budget: "S/ 30 - 65", desc: "Moderna sede de la clásica panadería en la Av. Vasco Núñez de Balboa.", lat: -12.1281, lng: -77.0261, icon: "fa-cake-candles" },
+        { name: "Cafetería Starbucks Óvalo Gutiérrez", district: "Miraflores", category: "MEDIUM", budget: "S/ 18 - 38", desc: "Espacio amplio de encuentro urbano y café expreso.", lat: -12.1112, lng: -77.0358, icon: "fa-mug-hot" },
+        { name: "Crepes & Waffles Miraflores", district: "Miraflores", category: "MEDIUM", budget: "S/ 30 - 60", desc: "Platos dulces y salados con helados artesanales.", lat: -12.1228, lng: -77.0320, icon: "fa-utensils" },
+        { name: "Chocolatería Helena", district: "Miraflores", category: "MEDIUM", budget: "S/ 20 - 50", desc: "Tienda de chocotejas e icónicos bombones iqueños.", lat: -12.1202, lng: -77.0301, icon: "fa-gift" },
+
+        // Comas (12)
+        { name: "Mallplaza Comas", district: "Comas", category: "MEDIUM", budget: "S/ 20 - 70", desc: "El centro comercial y gastronómico principal de Lima Norte.", lat: -11.9442, lng: -77.0631, icon: "fa-bag-shopping" },
+        { name: "Bulevar Gastronómico El Retablo", district: "Comas", category: "MEDIUM", budget: "S/ 25 - 55", desc: "Concurrido pasaje lleno de pollerías y cevicherías locales.", lat: -11.9501, lng: -77.0592, icon: "fa-utensils" },
+        { name: "Pollería Pardos Chicken Comas", district: "Comas", category: "MEDIUM", budget: "S/ 35 - 65", desc: "Especialista en pollo a la brasa con receta tradicional en Mallplaza.", lat: -11.9448, lng: -77.0628, icon: "fa-drumstick-bite" },
+        { name: "Chifa San Joy Lao Comas", district: "Comas", category: "MEDIUM", budget: "S/ 35 - 70", desc: "Cocina oriental peruana en un ambiente moderno y amplio.", lat: -11.9488, lng: -77.0581, icon: "fa-bowl-rice" },
+        { name: "Cineplanet Comas", district: "Comas", category: "MEDIUM", budget: "S/ 20 - 45", desc: "Complejo cinematográfico sobre la Av. Túpac Amaru.", lat: -11.9381, lng: -77.0508, icon: "fa-film" },
+        { name: "Rally Kart Comas", district: "Comas", category: "MEDIUM", budget: "S/ 30 - 55", desc: "Circuito al aire libre para carreras de karts.", lat: -11.9438, lng: -77.0638, icon: "fa-flag-checkered" },
+        { name: "Pollería Roky's Retablo", district: "Comas", category: "MEDIUM", budget: "S/ 25 - 50", desc: "Tradicional pollería de gran tamaño muy concurrida.", lat: -11.9512, lng: -77.0585, icon: "fa-drumstick-bite" },
+        { name: "Cevichería Las Brisas Comas", district: "Comas", category: "MEDIUM", budget: "S/ 30 - 65", desc: "Restaurante marino famoso por sus rondas de mariscos.", lat: -11.9398, lng: -77.0541, icon: "fa-fish" },
+        { name: "Cafetería Tostao Comas", district: "Comas", category: "MEDIUM", budget: "S/ 15 - 35", desc: "Café de grano recién tostado y emparedados artesanales.", lat: -11.9458, lng: -77.0612, icon: "fa-mug-hot" },
+        { name: "Chifa China Comas", district: "Comas", category: "MEDIUM", budget: "S/ 25 - 55", desc: "Restaurante oriental clásico cantonés muy popular.", lat: -11.9321, lng: -77.0498, icon: "fa-bowl-rice" },
+        { name: "Heladería Gelarti Mallplaza", district: "Comas", category: "MEDIUM", budget: "S/ 15 - 30", desc: "Helados gourmet con cremas de fruta natural.", lat: -11.9440, lng: -77.0629, icon: "fa-ice-cream" },
+        { name: "Restaurante El Hornero Comas", district: "Comas", category: "MEDIUM", budget: "S/ 45 - 80", desc: "Cortes parrilleros al carbón con guarniciones peruanas.", lat: -11.9472, lng: -77.0570, icon: "fa-fire" },
+
+        // Los Olivos (13)
+        { name: "Real Plaza Pro", district: "Los Olivos", category: "MEDIUM", budget: "S/ 20 - 70", desc: "Centro de comercio y entretenimiento en la Panamericana Norte.", lat: -11.9521, lng: -77.0781, icon: "fa-bag-shopping" },
+        { name: "Juegos Mecánicos Metro Izaguirre", district: "Los Olivos", category: "MEDIUM", budget: "S/ 15 - 40", desc: "Feria de juegos mecánicos y entretenimiento en la explanada.", lat: -11.9902, lng: -77.0621, icon: "fa-ticket" },
+        { name: "Chifa Wa Lok Los Olivos", district: "Los Olivos", category: "MEDIUM", budget: "S/ 35 - 75", desc: "Sede norteña de uno de los chifas de más alta reputación de Lima.", lat: -11.9912, lng: -77.0718, icon: "fa-bowl-rice" },
+        { name: "Cafetería Donal's Las Palmeras", district: "Los Olivos", category: "MEDIUM", budget: "S/ 20 - 40", desc: "Clásica juguería y sanguchería con jugo de fruta recién exprimido.", lat: -11.9861, lng: -77.0722, icon: "fa-glass-water" },
+        { name: "Pepper's Chicken Los Olivos", district: "Los Olivos", category: "MEDIUM", budget: "S/ 25 - 55", desc: "Pollería reconocida en la Av. Antúnez de Mayolo.", lat: -11.9951, lng: -77.0712, icon: "fa-drumstick-bite" },
+        { name: "Cineplanet Real Plaza Pro", district: "Los Olivos", category: "MEDIUM", budget: "S/ 20 - 45", desc: "Salas cinematográficas dentro de Real Plaza Pro.", lat: -11.9528, lng: -77.0778, icon: "fa-film" },
+        { name: "Cevichería Choza Azul", district: "Los Olivos", category: "MEDIUM", budget: "S/ 35 - 70", desc: "Restaurante marino emblemático cerca de la Av. Izaguirre.", lat: -11.9928, lng: -77.0732, icon: "fa-fish" },
+        { name: "Pollería Pardos Chicken Izaguirre", district: "Los Olivos", category: "MEDIUM", budget: "S/ 35 - 65", desc: "Excelente opción de pollo a la brasa en el eje comercial.", lat: -11.9908, lng: -77.0682, icon: "fa-drumstick-bite" },
+        { name: "Pastelería Viena Los Olivos", district: "Los Olivos", category: "MEDIUM", budget: "S/ 18 - 40", desc: "Cafetería y lonches finos con bocaditos salados y dulces.", lat: -11.9881, lng: -77.0705, icon: "fa-cake-candles" },
+        { name: "Salón de Té D'Gallia", district: "Los Olivos", category: "MEDIUM", budget: "S/ 20 - 45", desc: "Salón gastronómico para capuchinos y empanadas.", lat: -11.9842, lng: -77.0731, icon: "fa-mug-hot" },
+        { name: "Cevichería Punto Azul Los Olivos", district: "Los Olivos", category: "MEDIUM", budget: "S/ 40 - 75", desc: "Comida marina gourmet en local moderno e iluminado.", lat: -11.9938, lng: -77.0691, icon: "fa-fish" },
+        { name: "Burger King Izaguirre", district: "Los Olivos", category: "MEDIUM", budget: "S/ 18 - 38", desc: "Hamburguesas a la parrilla en pleno corazón comercial.", lat: -11.9910, lng: -77.0652, icon: "fa-burger" },
+        { name: "Bulevar Gastronómico Izaguirre", district: "Los Olivos", category: "MEDIUM", budget: "S/ 25 - 60", desc: "Pasaje con oferta variada de chifas, cevicherías y trattorias.", lat: -11.9915, lng: -77.0678, icon: "fa-utensils" },
+        // ==================== PREMIUM / NO ACCESIBLE (50) ====================
+        // Rímac (13)
+        { name: "Restaurante El Portal virreinal", district: "Rímac", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Plato de autor de cocina criolla maridado con bebida artesanal.", lat: -12.0418, lng: -77.0228, icon: "fa-utensils" },
+        { name: "Casona Virreinal Rímac", district: "Rímac", category: "PREMIUM", budget: "S/ 130 - 190", desc: "Cena a la carta de alta cocina criolla (seco de res) con chicha artesanal.", lat: -12.0391, lng: -77.0292, icon: "fa-utensils" },
+        { name: "Bistró Quinta de Presa", district: "Rímac", category: "PREMIUM", budget: "S/ 80 - 150", desc: "Almuerzo ejecutivo criollo gourmet con postre de antaño.", lat: -12.0331, lng: -77.0318, icon: "fa-utensils" },
+        { name: "Restaurante Las Laderas", district: "Rímac", category: "PREMIUM", budget: "S/ 100 - 180", desc: "Experiencia personal criolla con coctelería de autor sin alcohol.", lat: -12.0288, lng: -77.0310, icon: "fa-utensils" },
+        { name: "Casona Galería Las 13 Puertas", district: "Rímac", category: "PREMIUM", budget: "S/ 70 - 120", desc: "Ingreso a exposiciones de arte contemporáneo con aperitivo de cortesía.", lat: -12.0412, lng: -77.0280, icon: "fa-palette" },
+        { name: "Pollería Brasa Rímac Gourmet", district: "Rímac", category: "PREMIUM", budget: "S/ 80 - 130", desc: "Menú especial con papas nativas orgánicas y postre criollo tradicional.", lat: -12.0371, lng: -77.0305, icon: "fa-drumstick-bite" },
+        { name: "Picantería El Misti de Oro (Selección)", district: "Rímac", category: "PREMIUM", budget: "S/ 90 - 160", desc: "Ronda marina individual de pesca del día con chicha de jora premium.", lat: -12.0359, lng: -77.0291, icon: "fa-fish" },
+        { name: "Restaurante Turístico Rímac", district: "Rímac", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Menú ejecutivo criollo de 3 tiempos preparado por chefs reconocidos.", lat: -12.0368, lng: -77.0312, icon: "fa-utensils" },
+        { name: "Casona Museo del Rímac", district: "Rímac", category: "PREMIUM", budget: "S/ 80 - 140", desc: "Entrada general a la colección privada de pintura virreinal limeña.", lat: -12.0392, lng: -77.0310, icon: "fa-palette" },
+        { name: "Chicharronería Rímac Premium", district: "Rímac", category: "PREMIUM", budget: "S/ 70 - 110", desc: "Desayuno individual completo con chicharrón especial y jugos naturales.", lat: -12.0381, lng: -77.0281, icon: "fa-utensils" },
+        { name: "Dulcería La Flor de la Canela (Cata)", district: "Rímac", category: "PREMIUM", budget: "S/ 80 - 130", desc: "Cata de postres virreinales con café de origen tostado al momento.", lat: -12.0368, lng: -77.0312, icon: "fa-cookie" },
+        { name: "Pastelería Tradicional Virreinal", district: "Rímac", category: "PREMIUM", budget: "S/ 80 - 120", desc: "Lonche individual gourmet con pasteles criollos y té de especialidad.", lat: -12.0348, lng: -77.0269, icon: "fa-cake-candles" },
+        { name: "Comedor Típico Rímaqueño", district: "Rímac", category: "PREMIUM", budget: "S/ 100 - 160", desc: "Almuerzo personal a la carta de cocina virreinal marinada.", lat: -12.0388, lng: -77.0295, icon: "fa-utensils" },
+
+        // Miraflores (13)
+        { name: "Tanta de Miraflores", district: "Miraflores", category: "PREMIUM", budget: "S/ 110 - 180", desc: "Cocina criolla peruana de autor por Gastón Acurio en la Av. Vasco Núñez de Balboa.", lat: -12.1288, lng: -77.0258, icon: "fa-utensils" },
+        { name: "Teatro La Plaza (Larcomar)", district: "Miraflores", category: "PREMIUM", budget: "S/ 90 - 160", desc: "Entrada preferencial individual para obras teatrales de primer nivel.", lat: -12.1319, lng: -77.0305, icon: "fa-masks-theater" },
+        { name: "Cineplanet VIP Larcomar", district: "Miraflores", category: "PREMIUM", budget: "S/ 85 - 140", desc: "Sala Prime reclinable con servicio a la mesa de platos y bebidas gourmet.", lat: -12.1315, lng: -77.0301, icon: "fa-film" },
+        { name: "Galería Dédalo", district: "Miraflores", category: "PREMIUM", budget: "S/ 100 - 190", desc: "Café de especialidad en patio ajardinado y compra de objeto de arte.", lat: -12.1281, lng: -77.0221, icon: "fa-palette" },
+        { name: "Restaurante Astrid y Gastón", district: "Miraflores", category: "PREMIUM", budget: "S/ 150 - 200", desc: "Plato principal a la carta en la legendaria Casa Moreyra de San Isidro / Miraflores.", lat: -12.1150, lng: -77.0310, icon: "fa-utensils" },
+        { name: "Isolina Taberna Peruana", district: "Miraflores", category: "PREMIUM", budget: "S/ 120 - 190", desc: "Plato criollo tradicional de porción abundante y refresco artesanal.", lat: -12.1251, lng: -77.0280, icon: "fa-utensils" },
+        { name: "Teatro Auditorio Miraflores", district: "Miraflores", category: "PREMIUM", budget: "S/ 70 - 120", desc: "Boleto preferencial individual para shows de comedia y drama.", lat: -12.1218, lng: -77.0291, icon: "fa-masks-theater" },
+        { name: "Restaurante Madam Tusan (Plato Chef)", district: "Miraflores", category: "PREMIUM", budget: "S/ 120 - 180", desc: "Plato personal especial del chef chifa acompañado de té de jazmín.", lat: -12.1105, lng: -77.0352, icon: "fa-bowl-rice" },
+        { name: "Café de la Paz (Cena Especial)", district: "Miraflores", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Cena gourmet a la carta frente al parque iluminado.", lat: -12.1201, lng: -77.0289, icon: "fa-utensils" },
+        { name: "La Tiendecita Blanca (Menú Especial)", district: "Miraflores", category: "PREMIUM", budget: "S/ 120 - 180", desc: "Plato de fondo de influencia alpina con postre fino individual.", lat: -12.1208, lng: -77.0298, icon: "fa-mug-hot" },
+        { name: "Librería Café El Virrey (Libro & Café)", district: "Miraflores", category: "PREMIUM", budget: "S/ 90 - 160", desc: "Consumo de café de origen más compra de una obra literaria seleccionada.", lat: -12.1231, lng: -77.0312, icon: "fa-book" },
+        { name: "Cevichería Punto Azul (Carta Fina)", district: "Miraflores", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Ceviche fino de trucha o lenguado con chicha morada concentrada.", lat: -12.1261, lng: -77.0241, icon: "fa-fish" },
+        { name: "Pastelería San Antonio (Tabla VIP)", district: "Miraflores", category: "PREMIUM", budget: "S/ 85 - 140", desc: "Tabla personal de salados artesanales con café tostado al momento.", lat: -12.1118, lng: -77.0278, icon: "fa-cake-candles" },
+
+        // Comas (12)
+        { name: "Rally Kart Comas (Tandas Pro)", district: "Comas", category: "PREMIUM", budget: "S/ 80 - 140", desc: "Múltiples tandas de velocidad individual en circuito cerrado de karts.", lat: -11.9438, lng: -77.0638, icon: "fa-flag-checkered" },
+        { name: "Restaurante Las Brisas Comas", district: "Comas", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Plato marino o criollo especial con show folclórico en vivo.", lat: -11.9398, lng: -77.0541, icon: "fa-fish" },
+        { name: "Parrillas Don Tito Comas", district: "Comas", category: "PREMIUM", budget: "S/ 120 - 180", desc: "Corte fino parrillero de res seleccionado con guarniciones peruanas.", lat: -11.9472, lng: -77.0570, icon: "fa-fire" },
+        { name: "Centro Campestre Comas (Full Day)", district: "Comas", category: "PREMIUM", budget: "S/ 100 - 160", desc: "Pasadía individual de descanso con almuerzo criollo a la carta.", lat: -11.9362, lng: -77.0510, icon: "fa-sun" },
+        { name: "Cineplanet Mallplaza Comas (Sala 3D/VIP)", district: "Comas", category: "PREMIUM", budget: "S/ 70 - 110", desc: "Función cinematográfica en sala especial con combo gigante individual.", lat: -11.9442, lng: -77.0631, icon: "fa-film" },
+        { name: "Leños & Carbón Comas (Gourmet)", district: "Comas", category: "PREMIUM", budget: "S/ 110 - 160", desc: "Plato personal de parrilla o pollo gourmet con bebida de frutas.", lat: -11.9450, lng: -77.0620, icon: "fa-fire" },
+        { name: "Chifa San Joy Lao Comas (Degustación)", district: "Comas", category: "PREMIUM", budget: "S/ 100 - 160", desc: "Degustación oriental individual de bocaditos dim sum y arroz chaufa.", lat: -11.9488, lng: -77.0581, icon: "fa-bowl-rice" },
+        { name: "Bulevar Gastronómico Retablo (Especial)", district: "Comas", category: "PREMIUM", budget: "S/ 90 - 150", desc: "Cena a la carta en el restaurante insigne del bulevar.", lat: -11.9501, lng: -77.0592, icon: "fa-utensils" },
+        { name: "Pardos Chicken Comas (Menú VIP)", district: "Comas", category: "PREMIUM", budget: "S/ 80 - 120", desc: "Pollo a la brasa especial con ensalada y postre artesanal.", lat: -11.9448, lng: -77.0628, icon: "fa-drumstick-bite" },
+        { name: "Campestre Los Girasoles", district: "Comas", category: "PREMIUM", budget: "S/ 100 - 150", desc: "Almuerzo personal criollo a la carta y uso de hamacas.", lat: -11.9280, lng: -77.0345, icon: "fa-tree" },
+        { name: "Cafetería Tostao Comas (Lonche VIP)", district: "Comas", category: "PREMIUM", budget: "S/ 70 - 110", desc: "Lonche individual con café de especialidad y pastel helado.", lat: -11.9458, lng: -77.0612, icon: "fa-mug-hot" },
+        { name: "Cineplanet Túpac Amaru (Formato 3D)", district: "Comas", category: "PREMIUM", budget: "S/ 75 - 120", desc: "Entrada en formato especial con dulcería personal.", lat: -11.9381, lng: -77.0508, icon: "fa-film" },
+
+        // Los Olivos (12)
+        { name: "Tanta de Los Olivos (Plaza Norte)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 110 - 180", desc: "Gastronomía criolla de autor a la carta en el centro comercial aledaño.", lat: -11.9960, lng: -77.0620, icon: "fa-utensils" },
+        { name: "Karts Real Plaza Pro", district: "Los Olivos", category: "PREMIUM", budget: "S/ 85 - 140", desc: "Carreras de karts individuales en circuito cerrado de carreras.", lat: -11.9521, lng: -77.0781, icon: "fa-flag-checkered" },
+        { name: "Cevichería Choza Azul (Plato Especial)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 110 - 160", desc: "Ceviche de pesca marina gourmet con limonada de la casa.", lat: -11.9928, lng: -77.0732, icon: "fa-fish" },
+        { name: "Arena Los Olivos (Entrada Preferencial)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 120 - 200", desc: "Boleto preferencial individual para shows de comedia o música.", lat: -11.9892, lng: -77.0698, icon: "fa-ticket" },
+        { name: "Club Campestre Izaguirre", district: "Los Olivos", category: "PREMIUM", budget: "S/ 100 - 160", desc: "Pasadía individual de descanso con almuerzo a la carta y piscina.", lat: -11.9918, lng: -77.0708, icon: "fa-sun" },
+        { name: "Cineplanet Real Plaza Pro (VIP)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 75 - 120", desc: "Función de cine especial con combo de canchita gigante.", lat: -11.9528, lng: -77.0778, icon: "fa-film" },
+        { name: "Chifa Wa Lok Los Olivos (Especial)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Plato de alta cocina oriental peruano-china con té de jazmín.", lat: -11.9912, lng: -77.0718, icon: "fa-bowl-rice" },
+        { name: "Pepper's Chicken Los Olivos (Parrilla)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 90 - 140", desc: "Parrilla personal de corte seleccionado con papas doradas.", lat: -11.9951, lng: -77.0712, icon: "fa-fire" },
+        { name: "Pastelería Viena Los Olivos (Lonche VIP)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 75 - 120", desc: "Sándwich especial de pavo, pastel artesanal y café expreso.", lat: -11.9881, lng: -77.0705, icon: "fa-cake-candles" },
+        { name: "Cafetería Donal's Las Palmeras", district: "Los Olivos", category: "PREMIUM", budget: "S/ 70 - 110", desc: "Jugo natural concentrado, sándwich de chicharrón y postre.", lat: -11.9861, lng: -77.0722, icon: "fa-glass-water" },
+        { name: "Cevichería Punto Azul Los Olivos", district: "Los Olivos", category: "PREMIUM", budget: "S/ 110 - 170", desc: "Plato marino gourmet de lenguado o trucha con chicha morada.", lat: -11.9938, lng: -77.0691, icon: "fa-fish" },
+        { name: "Salón de Té D'Gallia (Especial)", district: "Los Olivos", category: "PREMIUM", budget: "S/ 80 - 130", desc: "Tabla personal de salados gourmet y café pasado de finca.", lat: -11.9842, lng: -77.0731, icon: "fa-mug-hot" }
+    ];
+    // Estado Global
+        let map;
+        let markersGroup;
+        let currentDistrict = "ALL";
+        let currentCategory = "ALL";
+        let searchQuery = "";
+
+        // Configuración de categorías
+        const catConfig = {
+            ACCESSIBLE: { text: "Gratis", pinClass: "pin-accessible" },
+            MEDIUM: { text: "Medio", pinClass: "pin-medium" },
+            PREMIUM: { text: "Premium", pinClass: "pin-premium" }
+        };
+
+        // Inicialización al cargar el DOM
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            setupEvents();
+            render();
+        });
+
+        function initMap() {
+            map = L.map('map', { zoomControl: true, attributionControl: false }).setView([-11.985, -77.050], 11);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                subdomains: 'abcd'
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+        }
+
+        function render() {
+            markersGroup.clearLayers();
+            const listContainer = document.getElementById('locationsList');
+            listContainer.innerHTML = '';
+
+            const filtered = rawLocations.filter(loc => {
+                const matchDistrict = (currentDistrict === "ALL") || (loc.district === currentDistrict);
+                const matchCategory = (currentCategory === "ALL") || (loc.category === currentCategory);
+                const matchSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                    loc.district.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                    loc.desc.toLowerCase().includes(searchQuery.toLowerCase());
+
+                return matchDistrict && matchCategory && matchSearch;
+            });
+
+            document.getElementById('locationCount').textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div style="padding: 2rem; text-align: center; color: var(--color-text-light);">
+                        <p style="font-weight: 600; color: var(--color-charcoal);">No se encontraron lugares.</p>
+                        <p style="font-size: 0.8rem;">Prueba ajustando el texto o los filtros.</p>
+                    </div>`;
+                return;
+            }
+
+            const bounds = [];
+
+            filtered.forEach(loc => {
+                const cfg = catConfig[loc.category];
+                bounds.push([loc.lat, loc.lng]);
+
+                // Marcador del Mapa
+                const marker = L.marker([loc.lat, loc.lng], {
+                    icon: L.divIcon({
+                        html: `<div class="custom-pin ${cfg.pinClass}"><i class="fa-solid ${loc.icon}"></i></div>`,
+                        className: '',
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18],
+                        popupAnchor: [0, -18]
+                    })
+                });
+
+                const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name + " " + loc.district + " Lima Peru")}`;
+
+                const popupHtml = `
+                    <div class="popup-box">
+                        <span class="popup-title">${loc.name}</span>
+                        <p style="font-size: 0.8rem; color: var(--color-text-muted);">${loc.desc}</p>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700;">
+                            <span>${loc.district}</span>
+                            <span>${loc.budget}</span>
+                        </div>
+                        <a href="${gmapsUrl}" target="_blank" rel="noopener" class="popup-btn">
+                            <i class="fa-solid fa-map-location-dot" style="color: var(--color-terracotta);"></i> Abrir en Google Maps
+                        </a>
+                    </div>`;
+
+                marker.bindPopup(popupHtml);
+                markersGroup.addLayer(marker);
+
+                // Tarjeta Lateral
+                const card = document.createElement('div');
+                card.className = "location-card";
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <span class="card-district"><i class="fa-solid fa-location-dot" style="color: var(--color-terracotta);"></i> ${loc.district}</span>
+                            <h3 class="card-title">${loc.name}</h3>
+                        </div>
+                    </div>
+                    <p class="card-desc">${loc.desc}</p>
+                    <div class="card-footer">
+                        <span class="card-budget">${loc.budget}</span>
+                        <a href="${gmapsUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="card-maps-link">
+                            Ver en Maps <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 0.6rem;"></i>
+                        </a>
+                    </div>`;
+
+                card.addEventListener('click', () => {
+                    map.flyTo([loc.lat, loc.lng], 15, { duration: 1 });
+                    marker.openPopup();
+                    if (window.innerWidth <= 768) {
+                        showMapMobile();
+                    }
+                });
+
+                listContainer.appendChild(card);
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            }
+        }
+
+        function setupEvents() {
+            const searchInput = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearchBtn');
+
+            searchInput.addEventListener('input', e => {
+                searchQuery = e.target.value.trim();
+                clearBtn.style.display = searchQuery ? "block" : "none";
+                render();
+            });
+
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = "";
+                searchQuery = "";
+                clearBtn.style.display = "none";
+                render();
+            });
+
+            document.getElementById('districtFilter').addEventListener('change', e => {
+                currentDistrict = e.target.value;
+                render();
+            });
+
+            document.querySelectorAll('.pill-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentCategory = btn.getAttribute('data-category');
+                    render();
+                });
+            });
+
+            // Control de vista móvil
+            const btnMapMobile = document.getElementById('btnMapMobile');
+            const btnListMobile = document.getElementById('btnListMobile');
+
+            if (btnMapMobile && btnListMobile) {
+                btnMapMobile.addEventListener('click', showMapMobile);
+                btnListMobile.addEventListener('click', showListMobile);
+            }
+        }
+
+        function showMapMobile() {
+            document.getElementById('sidebar').classList.add('mobile-hidden');
+            document.getElementById('mapContainer').classList.remove('mobile-hidden');
+            document.getElementById('btnMapMobile').classList.add('active');
+            document.getElementById('btnListMobile').classList.remove('active');
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+
+        function showListMobile() {
+            document.getElementById('mapContainer').classList.add('mobile-hidden');
+            document.getElementById('sidebar').classList.remove('mobile-hidden');
+            document.getElementById('btnListMobile').classList.add('active');
+            document.getElementById('btnMapMobile').classList.remove('active');
+        }
+    </script>
+</body>
+</html>

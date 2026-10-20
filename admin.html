@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIMA URBANA | Panel Administrativo</title>
+    
+    <!-- Fuentes y CDN de Mapa e Iconos -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- CSS Nativo -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <style>
+        /* Estilos específicos para el Panel Administrativo */
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .metric-card {
+            background: #ffffff;
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .metric-info span {
+            display: block;
+            font-size: 0.8rem;
+            color: #6b7280;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .metric-info strong {
+            font-size: 1.8rem;
+            font-family: 'Playfair Display', serif;
+            color: #1f2937;
+        }
+
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .admin-controls {
+            background: #ffffff;
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .admin-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .btn-primary {
+            background: var(--color-terracotta, #c85a32);
+            color: #ffffff;
+            border: none;
+            padding: 0.65rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #b04b27;
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 0.65rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        /* Tabla Responsiva */
+        .table-card {
+            background: #ffffff;
+            border: 1px solid var(--color-border, #e5e7eb);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        .admin-table th {
+            background: #f9fafb;
+            padding: 0.85rem 1rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #6b7280;
+            font-weight: 700;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .admin-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+
+        .admin-table tbody tr:hover {
+            background: #fdfbf7;
+        }
+
+        .badge-chip {
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.725rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .chip-accessible { background: #eef7f2; color: #2d6a4f; }
+        .chip-medium { background: #fef3c7; color: #b45309; }
+        .chip-premium { background: #fce7f3; color: #9d174d; }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-edit { background: #eff6ff; color: #2563eb; }
+        .btn-edit:hover { background: #dbeafe; }
+        .btn-delete { background: #fef2f2; color: #dc2626; }
+        .btn-delete:hover { background: #fee2e2; }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.25s ease;
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-card {
+            background: #ffffff;
+            border-radius: 16px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .form-grid { grid-template-columns: 1fr; }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .form-group.full {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-control {
+            padding: 0.6rem 0.8rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            border-color: var(--color-terracotta, #c85a32);
+            box-shadow: 0 0 0 3px rgba(200, 90, 50, 0.15);
+        }
+
+        #pickerMap {
+            height: 220px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            background: #f9fafb;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="header-brand">
+            <div class="brand-icon"><i class="fa-solid fa-compass-drafting"></i></div>
+            <div>
+                <span class="brand-tag">Administración</span>
+                <h1 class="brand-title">Gestión de Lugares</h1>
+            </div>
+        </div>
+
+        <div class="header-badges">
+            <a href="index.html" class="btn-secondary" style="text-decoration: none;">
+                <i class="fa-solid fa-arrow-left"></i> Ver Mapa Público
+            </a>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        
+        <!-- Métricas Principales -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-info">
+                    <span>Total Lugares</span>
+                    <strong id="metricTotal">0</strong>
+                </div>
+                <div class="metric-icon" style="background: #f3f4f6; color: #374151;">
+                    <i class="fa-solid fa-map-pin"></i>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-info">
+                    <span>Gratis</span>
+                    <strong id="metricAccessible">0</strong>
+                </div>
+                <div class="metric-icon" style="background: #eef7f2; color: #2d6a4f;">
+                    <i class="fa-solid fa-tree"></i>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-info">
+                    <span>Medianos</span>
+                    <strong id="metricMedium">0</strong>
+                </div>
+                <div class="metric-icon" style="background: #fef3c7; color: #b45309;">
+                    <i class="fa-solid fa-utensils"></i>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-info">
+                    <span>Premium</span>
+                    <strong id="metricPremium">0</strong>
+                </div>
+                <div class="metric-icon" style="background: #fce7f3; color: #9d174d;">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Control -->
+        <div class="admin-controls">
+            <div class="filter-container" style="padding:0; background:transparent; border:none; box-shadow:none;">
+                <div class="search-wrapper" style="width: 260px;">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="adminSearch" placeholder="Buscar por nombre o distrito..." class="search-input">
+                </div>
+
+                <select id="adminDistrictFilter" class="district-select" style="width: 180px;">
+                    <option value="ALL">Todos los Distritos</option>
+                </select>
+
+                <select id="adminCategoryFilter" class="district-select" style="width: 160px;">
+                    <option value="ALL">Todas las Categorías</option>
+                    <option value="ACCESSIBLE">Gratis</option>
+                    <option value="MEDIUM">Medio</option>
+                    <option value="PREMIUM">Premium</option>
+                </select>
+            </div>
+
+            <div class="admin-actions">
+                <button class="btn-primary" id="btnNewLocation">
+                    <i class="fa-solid fa-plus"></i> Nuevo Lugar
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla de Datos -->
+        <div class="table-card">
+            <div class="table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Distrito</th>
+                            <th>Categoría</th>
+                            <th>Presupuesto</th>
+                            <th>Coordenadas</th>
+                            <th style="text-align: right;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Carga dinámica -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL FORMULARIO (Crear / Editar) -->
+    <div class="modal-overlay" id="locationModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Nuevo Lugar</h3>
+                <button class="btn-icon" id="btnCloseModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="locationForm">
+                <div class="modal-body">
+                    <input type="hidden" id="fieldId">
+
+                    <div class="form-grid">
+                        <div class="form-group full">
+                            <label>Nombre del Lugar *</label>
+                            <input type="text" id="fieldName" class="form-control" placeholder="Ej. Alameda de los Descalzos" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Distrito *</label>
+                            <input type="text" id="fieldDistrict" class="form-control" placeholder="Ej. Rímac" list="districtSuggestions" required>
+                            <datalist id="districtSuggestions">
+                                <option value="Rímac">
+                                <option value="Miraflores">
+                                <option value="Comas">
+                                <option value="Los Olivos">
+                            </datalist>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Categoría *</label>
+                            <select id="fieldCategory" class="form-control" required>
+                                <option value="ACCESSIBLE">Gratis (Accesible)</option>
+                                <option value="MEDIUM">Mediano (S/ 15 - 70)</option>
+                                <option value="PREMIUM">Premium (&le; S/ 200)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Texto de Presupuesto *</label>
+                            <input type="text" id="fieldBudget" class="form-control" placeholder="Ej. S/ 0 ó S/ 20 - 40" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Ícono (FontAwesome) *</label>
+                            <select id="fieldIcon" class="form-control" required>
+                                <option value="fa-tree">fa-tree (Árbol / Parque)</option>
+                                <option value="fa-water">fa-water (Agua / Vista al Mar)</option>
+                                <option value="fa-landmark">fa-landmark (Monumento / Plaza)</option>
+                                <option value="fa-utensils">fa-utensils (Restaurante / Comida)</option>
+                                <option value="fa-mug-hot">fa-mug-hot (Cafetería / Lonche)</option>
+                                <option value="fa-ice-cream">fa-ice-cream (Heladería)</option>
+                                <option value="fa-fish">fa-fish (Cevichería / Marino)</option>
+                                <option value="fa-drumstick-bite">fa-drumstick-bite (Pollería)</option>
+                                <option value="fa-bowl-rice">fa-bowl-rice (Chifa / Oriental)</option>
+                                <option value="fa-building-columns">fa-building-columns (Cultura / Museo)</option>
+                                <option value="fa-film">fa-film (Cine)</option>
+                                <option value="fa-bag-shopping">fa-bag-shopping (Mall / Compras)</option>
+                                <option value="fa-heart">fa-heart (Romántico)</option>
+                                <option value="fa-flag-checkered">fa-flag-checkered (Karts / Deporte)</option>
+                                <option value="fa-location-dot">fa-location-dot (General)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group full">
+                            <label>Descripción Corta *</label>
+                            <textarea id="fieldDesc" class="form-control" rows="2" placeholder="Breve reseña descriptiva..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Latitud *</label>
+                            <input type="number" step="any" id="fieldLat" class="form-control" placeholder="-12.0371" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Longitud *</label>
+                            <input type="number" step="any" id="fieldLng" class="form-control" placeholder="-77.0264" required>
+                        </div>
+
+                        <div class="form-group full">
+                            <label>Seleccionar Ubicación Exacta en el Mapa (Haz clic o arrastra el pin):</label>
+                            <div id="pickerMap"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelModal">Cancelar</button>
+                    <button type="submit" class="btn-primary" id="btnSaveLocation">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Lugar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Inicialización de Supabase
+        const SUPABASE_URL = 'https://awrolrkflflgodwlzonz.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3cm9scmtmbGZsZ29kd2x6b256Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0NjgzNzcsImV4cCI6MjEwODA0NDM3N30.P5ZZdB-k6ccPqES5LnGGO7jfzBLhApCz27P0Sz8WhMs';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Estado local
+        let adminLocations = [];
+        let pickerMap = null;
+        let pickerMarker = null;
+
+        const categoryBadges = {
+            ACCESSIBLE: '<span class="badge-chip chip-accessible"><i class="fa-solid fa-tree"></i> Gratis</span>',
+            MEDIUM: '<span class="badge-chip chip-medium"><i class="fa-solid fa-utensils"></i> Medio</span>',
+            PREMIUM: '<span class="badge-chip chip-premium"><i class="fa-solid fa-crown"></i> Premium</span>'
+        };
+
+        // Inicialización
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchLocations();
+            setupEventListeners();
+        });
+
+        async function fetchLocations() {
+            try {
+                const { data, error } = await _supabase
+                    .from('locations')
+                    .select('*')
+                    .order('id', { ascending: false });
+
+                if (error) throw error;
+
+                adminLocations = data.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    district: item.district,
+                    category: item.category,
+                    budget: item.budget,
+                    desc: item.description || item.desc || '',
+                    lat: parseFloat(item.lat),
+                    lng: parseFloat(item.lng),
+                    icon: item.icon || 'fa-location-dot'
+                }));
+
+                updateMetrics();
+                populateDistrictFilter();
+                renderTable();
+            } catch (err) {
+                console.error('Error al cargar datos desde Supabase:', err);
+                alert('No se pudieron cargar los datos de Supabase.');
+            }
+        }
+
+        function updateMetrics() {
+            document.getElementById('metricTotal').textContent = adminLocations.length;
+            document.getElementById('metricAccessible').textContent = adminLocations.filter(x => x.category === 'ACCESSIBLE').length;
+            document.getElementById('metricMedium').textContent = adminLocations.filter(x => x.category === 'MEDIUM').length;
+            document.getElementById('metricPremium').textContent = adminLocations.filter(x => x.category === 'PREMIUM').length;
+        }
+
+        function populateDistrictFilter() {
+            const districts = [...new Set(adminLocations.map(x => x.district))].sort();
+            const select = document.getElementById('adminDistrictFilter');
+            
+            select.innerHTML = '<option value="ALL">Todos los Distritos</option>';
+            districts.forEach(d => {
+                select.innerHTML += `<option value="${d}">${d}</option>`;
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            const search = document.getElementById('adminSearch').value.toLowerCase().trim();
+            const districtFilter = document.getElementById('adminDistrictFilter').value;
+            const categoryFilter = document.getElementById('adminCategoryFilter').value;
+
+            const filtered = adminLocations.filter(loc => {
+                const matchSearch = loc.name.toLowerCase().includes(search) || loc.district.toLowerCase().includes(search);
+                const matchDistrict = (districtFilter === 'ALL') || (loc.district === districtFilter);
+                const matchCategory = (categoryFilter === 'ALL') || (loc.category === categoryFilter);
+
+                return matchSearch && matchDistrict && matchCategory;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 2rem;">No se encontraron lugares registrados.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(loc => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <strong>${loc.name}</strong>
+                        <div style="font-size:0.75rem; color:#6b7280; max-width:280px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${loc.desc}</div>
+                    </td>
+                    <td>${loc.district}</td>
+                    <td>${categoryBadges[loc.category] || loc.category}</td>
+                    <td><strong>${loc.budget}</strong></td>
+                    <td style="font-family: monospace; font-size: 0.75rem;">${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}</td>
+                    <td style="text-align: right;">
+                        <button class="btn-icon btn-edit" onclick="editLocation(${loc.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn-icon btn-delete" onclick="deleteLocation(${loc.id})" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('adminSearch').addEventListener('input', renderTable);
+            document.getElementById('adminDistrictFilter').addEventListener('change', renderTable);
+            document.getElementById('adminCategoryFilter').addEventListener('change', renderTable);
+
+            document.getElementById('btnNewLocation').addEventListener('click', () => openModal());
+            document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+            document.getElementById('btnCancelModal').addEventListener('click', closeModal);
+
+            document.getElementById('locationForm').addEventListener('submit', handleFormSubmit);
+
+            // Sincronizar coordenadas desde inputs hacia el mapa picker
+            document.getElementById('fieldLat').addEventListener('change', syncPickerFromInputs);
+            document.getElementById('fieldLng').addEventListener('change', syncPickerFromInputs);
+        }
+
+        function initPickerMap(lat = -12.0371, lng = -77.0264) {
+            if (!pickerMap) {
+                pickerMap = L.map('pickerMap').setView([lat, lng], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(pickerMap);
+
+                pickerMarker = L.marker([lat, lng], { draggable: true }).addTo(pickerMap);
+
+                pickerMarker.on('dragend', function (e) {
+                    const coords = e.target.getLatLng();
+                    document.getElementById('fieldLat').value = coords.lat.toFixed(6);
+                    document.getElementById('fieldLng').value = coords.lng.toFixed(6);
+                });
+
+                pickerMap.on('click', function (e) {
+                    pickerMarker.setLatLng(e.latlng);
+                    document.getElementById('fieldLat').value = e.latlng.lat.toFixed(6);
+                    document.getElementById('fieldLng').value = e.latlng.lng.toFixed(6);
+                });
+            } else {
+                pickerMap.setView([lat, lng], 14);
+                pickerMarker.setLatLng([lat, lng]);
+                setTimeout(() => pickerMap.invalidateSize(), 200);
+            }
+        }
+
+        function syncPickerFromInputs() {
+            const lat = parseFloat(document.getElementById('fieldLat').value);
+            const lng = parseFloat(document.getElementById('fieldLng').value);
+            if (!isNaN(lat) && !isNaN(lng) && pickerMarker) {
+                pickerMarker.setLatLng([lat, lng]);
+                pickerMap.panTo([lat, lng]);
+            }
+        }
+
+        function openModal(location = null) {
+            const modal = document.getElementById('locationModal');
+            document.getElementById('locationForm').reset();
+
+            if (location) {
+                document.getElementById('modalTitle').textContent = 'Editar Lugar';
+                document.getElementById('fieldId').value = location.id;
+                document.getElementById('fieldName').value = location.name;
+                document.getElementById('fieldDistrict').value = location.district;
+                document.getElementById('fieldCategory').value = location.category;
+                document.getElementById('fieldBudget').value = location.budget;
+                document.getElementById('fieldIcon').value = location.icon;
+                document.getElementById('fieldDesc').value = location.desc;
+                document.getElementById('fieldLat').value = location.lat;
+                document.getElementById('fieldLng').value = location.lng;
+
+                modal.classList.add('active');
+                initPickerMap(location.lat, location.lng);
+            } else {
+                document.getElementById('modalTitle').textContent = 'Nuevo Lugar';
+                document.getElementById('fieldId').value = '';
+                document.getElementById('fieldLat').value = '-12.0371';
+                document.getElementById('fieldLng').value = '-77.0264';
+
+                modal.classList.add('active');
+                initPickerMap(-12.0371, -77.0264);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('locationModal').classList.remove('active');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('fieldId').value;
+            const payload = {
+                name: document.getElementById('fieldName').value.trim(),
+                district: document.getElementById('fieldDistrict').value.trim(),
+                category: document.getElementById('fieldCategory').value,
+                budget: document.getElementById('fieldBudget').value.trim(),
+                icon: document.getElementById('fieldIcon').value,
+                description: document.getElementById('fieldDesc').value.trim(),
+                lat: parseFloat(document.getElementById('fieldLat').value),
+                lng: parseFloat(document.getElementById('fieldLng').value)
+            };
+
+            const btnSave = document.getElementById('btnSaveLocation');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+            try {
+                if (id) {
+                    // Editar
+                    const { error } = await _supabase
+                        .from('locations')
+                        .update(payload)
+                        .eq('id', id);
+
+                    if (error) throw error;
+                } else {
+                    // Crear
+                    const { error } = await _supabase
+                        .from('locations')
+                        .insert([payload]);
+
+                    if (error) throw error;
+                }
+
+                closeModal();
+                await fetchLocations();
+            } catch (err) {
+                console.error('Error al guardar en Supabase:', err);
+                alert('Ocurrió un error al intentar guardar el lugar.');
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Lugar';
+            }
+        }
+
+        window.editLocation = function (id) {
+            const loc = adminLocations.find(x => x.id === id);
+            if (loc) openModal(loc);
+        };
+
+        window.deleteLocation = async function (id) {
+            const loc = adminLocations.find(x => x.id === id);
+            if (!loc) return;
+
+            if (confirm(`¿Estás seguro de que deseas eliminar "${loc.name}"? Esta acción no se puede deshacer.`)) {
+                try {
+                    const { error } = await _supabase
+                        .from('locations')
+                        .delete()
+                        .eq('id', id);
+
+                    if (error) throw error;
+
+                    await fetchLocations();
+                } catch (err) {
+                    console.error('Error al eliminar en Supabase:', err);
+                    alert('No se pudo eliminar el registro.');
+                }
+            }
+        };
+    </script>
+</body>
+</html>

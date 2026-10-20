@@ -55,11 +55,9 @@ html, body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
-body:has(.main-workspace) {
+body.page-app {
   height: 100vh;
   overflow: hidden;
 }
